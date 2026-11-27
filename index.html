@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PR Christmas Week</title>
+<meta name="description" content="Our shared family calendar for Christmas week in Puerto Rico, December 22–28.">
+<meta property="og:title" content="Puerto Rico · Christmas Week">
+<meta property="og:description" content="Add your plans to the family calendar, Dec 22–28.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg:#fbf7f0; --surface:#ffffff; --ink:#18323a; --ink-2:#4b6168; --ink-3:#8a9a9e;
+  --line:#e7e0d3; --line-soft:#f1ece3; --accent:#0f7c8f; --accent-ink:#ffffff; --accent-soft:#e2f2f4;
+  --red:#c8324f; --green:#2e8b57;
+  --hour:52px; --gutter:58px; --hh:58px; --colmin:118px;
+  --shadow:0 10px 30px rgba(24,50,58,.16), 0 2px 6px rgba(24,50,58,.08);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 "DM Sans",system-ui,-apple-system,sans-serif;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+
+/* header */
+header{flex:none;display:flex;align-items:center;gap:16px;padding:14px 20px 12px;padding-top:max(14px,env(safe-area-inset-top));border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fffdf9, var(--bg))}
+.brand{display:flex;align-items:center;gap:12px;min-width:0;flex:1}
+.sun{flex:none;width:40px;height:40px;border-radius:12px;background:linear-gradient(160deg,#ffb347 0%,#ff7a59 55%,#0f7c8f 56%,#0b5f6e 100%);position:relative;overflow:hidden}
+.sun:after{content:"";position:absolute;left:9px;top:8px;width:22px;height:22px;border-radius:50%;background:#ffe9a8;opacity:.9}
+.titles{min-width:0}
+h1{margin:0;font:650 22px/1.1 "Fraunces",Georgia,serif;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{margin-top:3px;color:var(--ink-2);font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.status{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-3)}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--ink-3);display:inline-block}
+.status.live i{background:var(--green);box-shadow:0 0 0 3px rgba(46,139,87,.15)}
+.status.err i{background:var(--red)}
+.actions{display:flex;gap:8px;align-items:center;flex:none}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{border-color:#d6ccba}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:#0b6878}
+.btn.danger{color:var(--red)}
+.btn.ghost{border-color:transparent;background:transparent}
+.who{max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.who b{font-weight:700}
+
+/* calendar */
+#scroller{flex:1;overflow:auto;position:relative;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+#cal{display:grid;grid-template-columns:var(--gutter) repeat(7,minmax(var(--colmin),1fr));min-width:calc(var(--gutter) + 7*var(--colmin));position:relative}
+.corner,.adlabel{position:sticky;left:0;z-index:6;background:var(--bg)}
+.corner{top:0;height:var(--hh);border-bottom:1px solid var(--line)}
+.adlabel{top:var(--hh);font-size:11px;color:var(--ink-3);text-align:right;padding:8px 8px 0 0;border-bottom:1px solid var(--line)}
+.dayhead{position:sticky;top:0;z-index:4;height:var(--hh);background:var(--bg);border-bottom:1px solid var(--line);border-left:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:0 4px}
+.dayhead .dow{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--ink-3);text-transform:uppercase}
+.dayhead .num{font:600 22px/1 "Fraunces",Georgia,serif}
+.dayhead .tag{font-size:10.5px;font-weight:700;color:var(--red);letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dayhead.xmas{background:linear-gradient(180deg,#fff2f2,var(--bg))}
+.dayhead.xmas .num{color:var(--red)}
+.ad-cell{position:sticky;top:var(--hh);z-index:3;background:var(--bg);border-bottom:1px solid var(--line);border-left:1px solid var(--line);min-height:34px;padding:4px 4px 3px;display:flex;flex-direction:column;gap:3px;cursor:cell}
+.gutter{position:sticky;left:0;z-index:2;background:var(--bg);height:calc(24*var(--hour))}
+.gutter span{position:absolute;right:8px;font-size:11px;color:var(--ink-3);transform:translateY(-50%);white-space:nowrap}
+.col{position:relative;z-index:0;height:calc(24*var(--hour));border-left:1px solid var(--line);background-color:var(--surface);
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(var(--line-soft) 1px,transparent 1px);
+  background-size:100% var(--hour),100% calc(var(--hour)/2);cursor:cell;touch-action:pan-x pan-y}
+.col.night{}
+.col .shade{position:absolute;left:0;right:0;background:rgba(24,50,58,.025);pointer-events:none}
+
+/* events */
+.ev{position:absolute;border-radius:7px;padding:3px 6px 3px 8px;overflow:hidden;font-size:12px;line-height:1.25;cursor:grab;
+  background:var(--c-bg);color:var(--c-ink);border:1px solid var(--c-edge);border-left:4px solid var(--c-bar);
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:box-shadow .15s, opacity .15s}
+.ev:hover{box-shadow:0 3px 10px rgba(24,50,58,.14);z-index:2}
+.ev .t{font-weight:700;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;word-break:break-word}
+.ev.short .t{-webkit-line-clamp:1;display:block;white-space:nowrap}
+.ev .m{opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev .by{opacity:.65;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev .handle{position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize}
+.ev .handle:after{content:"";position:absolute;left:50%;bottom:2px;width:18px;height:3px;margin-left:-9px;border-radius:2px;background:var(--c-bar);opacity:0;transition:opacity .15s}
+.ev:hover .handle:after{opacity:.6}
+.ev.dragging{opacity:.35}
+.ev.ghost{z-index:20;box-shadow:var(--shadow);cursor:grabbing;opacity:.95;pointer-events:none}
+.ev.ghost.new{background:var(--accent-soft);border-color:#9fd3dc;border-left-color:var(--accent);color:#0b4f5b}
+.ev.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,30%{box-shadow:0 0 0 3px #ffd166, 0 4px 12px rgba(0,0,0,.15)}100%{box-shadow:none}}
+.chip{border-radius:6px;padding:3px 7px;font-size:12px;font-weight:700;cursor:grab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:var(--c-bg);color:var(--c-ink);border:1px solid var(--c-edge);border-left:4px solid var(--c-bar);-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.chip.dragging{opacity:.35}
+.chip.ghost{box-shadow:var(--shadow);pointer-events:none}
+body.is-dragging, body.is-dragging *{cursor:grabbing!important}
+body.is-resizing, body.is-resizing *{cursor:ns-resize!important}
+
+.c-ocean{--c-bg:#dff1f4;--c-edge:#c3e4ea;--c-bar:#1d8fa6;--c-ink:#0c4a57}
+.c-palm{--c-bg:#e2f2de;--c-edge:#c9e5c3;--c-bar:#3d8b4a;--c-ink:#1f4d27}
+.c-hibiscus{--c-bg:#fde1e8;--c-edge:#f7c6d3;--c-bar:#d6336c;--c-ink:#7a1c3d}
+.c-mango{--c-bg:#feefd2;--c-edge:#f8dcaa;--c-bar:#e08a00;--c-ink:#6b4300}
+.c-orchid{--c-bg:#eee5f8;--c-edge:#dccdf0;--c-bar:#8a5cc7;--c-ink:#452a6e}
+.c-sand{--c-bg:#f1eadf;--c-edge:#e2d6c3;--c-bar:#9a7b4f;--c-ink:#4d3b22}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(18,36,42,.38);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;animation:fade .15s}
+@keyframes fade{from{opacity:0}}
+.modal{background:var(--surface);border-radius:18px;box-shadow:var(--shadow);width:100%;max-width:460px;max-height:calc(100dvh - 32px);overflow:auto;padding:20px 20px 16px;animation:pop .18s ease-out}
+@keyframes pop{from{transform:translateY(8px) scale(.98);opacity:0}}
+.modal h2{margin:0 0 4px;font:650 20px/1.2 "Fraunces",Georgia,serif}
+.modal p.hint{margin:0 0 14px;color:var(--ink-2);font-size:14px}
+.field{display:block;margin-bottom:12px}
+.field>span{display:block;font-size:12px;font-weight:700;color:var(--ink-2);margin-bottom:5px;letter-spacing:.02em}
+.inp{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff;outline:none;font-size:16px}
+.inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.inp.title{font-size:19px;font-weight:600;border:none;border-bottom:2px solid var(--line);border-radius:0;padding:6px 2px 8px}
+.inp.title:focus{box-shadow:none;border-bottom-color:var(--accent)}
+textarea.inp{resize:vertical;min-height:64px}
+.row{display:flex;gap:8px;align-items:center}
+.row>*{flex:1;min-width:0}
+.row .dash{flex:none;color:var(--ink-3)}
+.check{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:500;margin:2px 0 12px;cursor:pointer}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.swatches{display:flex;gap:8px;flex-wrap:wrap}
+.sw{width:30px;height:30px;border-radius:50%;border:2px solid transparent;background:var(--c-bar);padding:0;position:relative}
+.sw[aria-pressed="true"]{box-shadow:0 0 0 2px #fff inset;border-color:var(--c-bar)}
+.maplink{display:inline-block;margin-top:6px;font-size:13px;color:var(--accent);font-weight:600;text-decoration:none}
+.maplink:hover{text-decoration:underline}
+.meta{font-size:12px;color:var(--ink-3);margin:4px 0 12px}
+.foot{display:flex;gap:8px;align-items:center;margin-top:6px}
+.foot .grow{flex:1}
+.err{color:var(--red);font-size:13px;margin:-4px 0 10px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#17323a;color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;font-weight:500;box-shadow:var(--shadow);z-index:60;transition:opacity .2s, transform .2s;white-space:nowrap}
+.toast.hide{opacity:0;transform:translate(-50%,10px);pointer-events:none}
+.loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:14px;pointer-events:none}
+
+@media (max-width:720px){
+  :root{--gutter:44px;--colmin:104px;--hour:50px}
+  header{padding:10px 12px 10px;padding-top:max(10px,env(safe-area-inset-top));gap:10px;flex-wrap:wrap}
+  .sun{width:34px;height:34px;border-radius:10px}
+  .sun:after{left:7px;top:6px;width:20px;height:20px}
+  h1{font-size:18px}
+  .sub .tz{display:none}
+  .actions{width:100%}
+  .actions .who{flex:1;max-width:none;justify-content:flex-start}
+  .gutter span{right:5px;font-size:10px}
+  .ev .handle{height:12px}
+  .modal{border-radius:16px;padding:18px 16px 14px}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="sun" aria-hidden="true"></div>
+    <div class="titles">
+      <h1>Puerto Rico · Christmas Week</h1>
+      <div class="sub"><span>Dec 22 – 28, 2026</span><span class="tz">All times are Puerto Rico time</span><span class="status" id="status"><i></i><span>Connecting…</span></span></div>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn ghost who" id="whoBtn" title="Change your name"></button>
+    <button class="btn primary" id="addBtn"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>New event</button>
+  </div>
+</header>
+
+<div id="scroller">
+  <div id="cal"></div>
+  <div class="loading" id="loading">Loading the calendar…</div>
+</div>
+
+<div class="toast hide" id="toast"></div>
+
+<!-- name modal -->
+<div class="scrim" id="nameScrim" hidden>
+  <form class="modal" id="nameForm" autocomplete="on">
+    <h2>¡Bienvenidos! Who's planning?</h2>
+    <p class="hint">Type your name so everyone knows who added what. Every change you save shows up for the whole family.</p>
+    <label class="field"><span>Your name</span><input class="inp" id="nameInput" name="name" maxlength="40" placeholder="e.g. Tía Carmen" required></label>
+    <div class="foot"><div class="grow"></div><button type="button" class="btn" id="nameCancel" hidden>Cancel</button><button class="btn primary" type="submit">Continue</button></div>
+  </form>
+</div>
+
+<!-- event modal -->
+<div class="scrim" id="evScrim" hidden>
+  <form class="modal" id="evForm" autocomplete="off">
+    <label class="field"><input class="inp title" id="fTitle" maxlength="120" placeholder="Add a title" required></label>
+    <div class="field">
+      <span>When</span>
+      <select class="inp" id="fDay"></select>
+    </div>
+    <label class="check"><input type="checkbox" id="fAllDay"> All day</label>
+    <div class="field" id="timeRow">
+      <div class="row"><select class="inp" id="fStart" aria-label="Start time"></select><span class="dash">–</span><select class="inp" id="fEnd" aria-label="End time"></select></div>
+    </div>
+    <label class="field"><span>Where</span><input class="inp" id="fLoc" maxlength="200" placeholder="e.g. Old San Juan, El Yunque, Abuela's"></label>
+    <a class="maplink" id="mapLink" target="_blank" rel="noopener" hidden>Open in Google Maps ↗</a>
+    <label class="field" style="margin-top:10px"><span>Notes</span><textarea class="inp" id="fNotes" maxlength="1500" placeholder="Who's going, what to bring, reservations…"></textarea></label>
+    <div class="field"><span>Color</span><div class="swatches" id="fColors"></div></div>
+    <div class="meta" id="fMeta"></div>
+    <div class="err" id="fErr" hidden></div>
+    <div class="foot">
+      <button type="button" class="btn danger" id="delBtn" hidden>Delete</button>
+      <div class="grow"></div>
+      <button type="button" class="btn" id="cancelBtn">Cancel</button>
+      <button type="submit" class="btn primary" id="saveBtn">Save</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var SB_URL = "https://cbztshqauiwjvuraesck.supabase.co";
+  var SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNienRzaHFhdWl3anZ1cmFlc2NrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkxOTAxNjksImV4cCI6MjEwNDc2NjE2OX0.Nd3SzgQBZ2xi-FmuLbbGFYb4K3H197FD32YIPyk4ssw";
+  var TABLE = "pr_trip_events";
+
+  var DAYS = [
+    {date:"2026-12-22", dow:"Tue", num:22},
+    {date:"2026-12-23", dow:"Wed", num:23},
+    {date:"2026-12-24", dow:"Thu", num:24, tag:"Nochebuena"},
+    {date:"2026-12-25", dow:"Fri", num:25, tag:"Christmas", xmas:true},
+    {date:"2026-12-26", dow:"Sat", num:26},
+    {date:"2026-12-27", dow:"Sun", num:27},
+    {date:"2026-12-28", dow:"Mon", num:28, tag:"Día de los Inocentes"}
+  ];
+  var COLORS = ["ocean","palm","hibiscus","mango","orchid","sand"];
+  var COLOR_NAMES = {ocean:"Ocean",palm:"Palm",hibiscus:"Hibiscus",mango:"Mango",orchid:"Orchid",sand:"Sand"};
+  var SNAP = 15;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var events = [];           // rows from the database
+  var myName = "";
+  var recentMine = {};       // id -> timestamp of my own saves (to skip the "flash")
+  var sb = null;
+
+  // ---------- small helpers ----------
+  function store(k, v){ try{ if(v===undefined) return localStorage.getItem(k); localStorage.setItem(k, v); }catch(e){ return null; } }
+  function uuid(){
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c=="x"?r:(r&3|8)).toString(16);});
+  }
+  function hourPx(){ return parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--hour")) || 52; }
+  function fmt(min, withAmPm){
+    if (min >= 1440) min = 1440;
+    var h = Math.floor(min/60) % 24, m = min % 60, ap = h < 12 ? "am" : "pm";
+    if (min === 1440) { h = 0; ap = "am"; }
+    var h12 = h % 12 === 0 ? 12 : h % 12;
+    return h12 + (m ? ":" + (m<10?"0":"") + m : "") + (withAmPm === false ? "" : ap);
+  }
+  function fmtRange(s, e){
+    var sAp = (s % 1440) < 720 ? "am" : "pm", eAp = (e % 1440) < 720 || e === 1440 ? "am" : "pm";
+    return (sAp === eAp && e !== 1440 ? fmt(s,false) : fmt(s)) + " – " + fmt(e);
+  }
+  function dayIdx(date){ for (var i=0;i<DAYS.length;i++) if (DAYS[i].date===date) return i; return 0; }
+  function byId(id){ for (var i=0;i<events.length;i++) if (events[i].id===id) return events[i]; return null; }
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function ago(iso){
+    var s = (Date.now() - new Date(iso).getTime())/1000;
+    if (s < 60) return "just now"; if (s < 3600) return Math.round(s/60) + " min ago";
+    if (s < 86400) return Math.round(s/3600) + " hr ago";
+    return new Date(iso).toLocaleDateString(undefined,{month:"short",day:"numeric"});
+  }
+  var toastTimer;
+  function toast(msg){ var t=$("toast"); t.textContent=msg; t.classList.remove("hide"); clearTimeout(toastTimer); toastTimer=setTimeout(function(){t.classList.add("hide");}, 2400); }
+  function setStatus(kind, text){ var s=$("status"); s.className="status "+(kind||""); s.lastChild.textContent=text; }
+  function el(tag, cls, text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+
+  // ---------- build the grid ----------
+  var cal = $("cal"), scroller = $("scroller"), cols = [], adCells = [];
+  function buildGrid(){
+    cal.appendChild(el("div","corner"));
+    DAYS.forEach(function(d){
+      var h = el("div","dayhead"+(d.xmas?" xmas":""));
+      h.appendChild(el("div","dow",d.dow)); h.appendChild(el("div","num",String(d.num)));
+      if (d.tag) h.appendChild(el("div","tag",d.tag));
+      cal.appendChild(h);
+    });
+    cal.appendChild(el("div","adlabel","all day"));
+    DAYS.forEach(function(d,i){ var c=el("div","ad-cell"); c.dataset.day=i; adCells.push(c); cal.appendChild(c); });
+    var g = el("div","gutter");
+    for (var h=1; h<24; h++){ var s=el("span",null, fmt(h*60).replace("am"," AM").replace("pm"," PM")); s.style.top="calc("+h+" * var(--hour))"; g.appendChild(s); }
+    cal.appendChild(g);
+    DAYS.forEach(function(d,i){
+      var c=el("div","col"); c.dataset.day=i;
+      var n1=el("div","shade"); n1.style.top="0"; n1.style.height="calc(7 * var(--hour))"; c.appendChild(n1);
+      var n2=el("div","shade"); n2.style.top="calc(22 * var(--hour))"; n2.style.height="calc(2 * var(--hour))"; c.appendChild(n2);
+      cols.push(c); cal.appendChild(c);
+    });
+  }
+
+  // ---------- render events ----------
+  function layoutDay(list){
+    // Google-Calendar style: overlapping events share the width.
+    list.sort(function(a,b){ return a.start_min-b.start_min || (b.end_min-b.start_min)-(a.end_min-a.start_min); });
+    var out = [], cluster = [], colsEnd = [], clusterEnd = -1;
+    function flush(){ cluster.forEach(function(x){ x.n = colsEnd.length; }); out = out.concat(cluster); cluster=[]; colsEnd=[]; }
+    list.forEach(function(ev){
+      if (ev.start_min >= clusterEnd && cluster.length) flush();
+      var c = 0; while (c < colsEnd.length && colsEnd[c] > ev.start_min) c++;
+      colsEnd[c] = ev.end_min; clusterEnd = Math.max(clusterEnd, ev.end_min);
+      if (!cluster.length) clusterEnd = ev.end_min;
+      cluster.push({ev:ev, c:c});
+    });
+    if (cluster.length) flush();
+    return out;
+  }
+  function render(flashIds){
+    flashIds = flashIds || {};
+    cols.forEach(function(c){ Array.prototype.slice.call(c.querySelectorAll(".ev")).forEach(function(x){x.remove();}); });
+    adCells.forEach(function(c){ c.textContent=""; });
+    var H = hourPx();
+    DAYS.forEach(function(d, i){
+      var dayEvents = events.filter(function(e){ return e.day===d.date; });
+      dayEvents.filter(function(e){return e.all_day;}).sort(function(a,b){return a.title.localeCompare(b.title);}).forEach(function(e){
+        var ch = el("div","chip c-"+(COLORS.indexOf(e.color)>=0?e.color:"ocean"), e.title);
+        ch.dataset.id = e.id; ch.title = e.title + (e.created_by ? " · added by "+e.created_by : "");
+        if (flashIds[e.id]) ch.classList.add("flash");
+        adCells[i].appendChild(ch);
+      });
+      layoutDay(dayEvents.filter(function(e){return !e.all_day;})).forEach(function(p){
+        var e = p.ev, node = eventNode(e, H);
+        var w = 100 / p.n;
+        node.style.left = "calc(" + (p.c*w) + "% + 2px)";
+        node.style.width = "calc(" + w + "% - " + (p.n>1?3:6) + "px)";
+        node.style.zIndex = 1 + p.c;
+        if (flashIds[e.id]) node.classList.add("flash");
+        cols[i].appendChild(node);
+      });
+    });
+  }
+  function eventNode(e, H, ghost){
+    var dur = e.end_min - e.start_min;
+    var node = el("div","ev c-"+(COLORS.indexOf(e.color)>=0?e.color:"ocean") + (dur <= 30 ? " short" : ""));
+    node.dataset.id = e.id || "";
+    node.style.top = (e.start_min/60*H) + "px";
+    node.style.height = Math.max(dur/60*H - 2, 16) + "px";
+    if (dur <= 30) {
+      var t = el("div","t"); t.textContent = (e.title || "(new event)") + ", " + fmt(e.start_min); node.appendChild(t);
+    } else {
+      node.appendChild(el("div","t", e.title || "(new event)"));
+      node.appendChild(el("div","m", fmtRange(e.start_min, e.end_min)));
+      if (e.location && dur >= 60) node.appendChild(el("div","m", e.location));
+      if (e.created_by && dur >= 90) node.appendChild(el("div","by", "by " + e.created_by));
+    }
+    if (!ghost) {
+      node.title = e.title + "\n" + fmtRange(e.start_min,e.end_min) + (e.location ? "\n" + e.location : "") + (e.created_by ? "\nAdded by " + e.created_by : "");
+      node.appendChild(el("div","handle"));
+    }
+    return node;
+  }
+
+  // ---------- hit testing & dragging ----------
+  function locate(x, y){
+    var day = 0;
+    for (var i=0;i<cols.length;i++){ var r = cols[i].getBoundingClientRect(); if (x >= r.left) day = i; }
+    var top = cols[0].getBoundingClientRect().top;
+    return { day: day, min: (y - top) / hourPx() * 60 };
+  }
+  function floorSnap(m){ return Math.floor(m/SNAP)*SNAP; }
+  function roundSnap(m){ return Math.round(m/SNAP)*SNAP; }
+
+  var press = null, drag = null, last = {x:0,y:0}, autoRAF = null;
+
+  cal.addEventListener("pointerdown", function(e){
+    if (e.button !== undefined && e.button !== 0) return;
+    if (drag) return;
+    var evEl = e.target.closest(".ev,.chip"), col = e.target.closest(".col"), ad = e.target.closest(".ad-cell");
+    if (!evEl && !col && !ad) return;
+    var ev = evEl ? byId(evEl.dataset.id) : null;
+    if (evEl && !ev) return;
+    var handle = !!e.target.closest(".handle");
+    press = { x:e.clientX, y:e.clientY, t:Date.now(), touch: e.pointerType === "touch", evEl:evEl, ev:ev, handle:handle, col:col, ad:ad };
+    last = {x:e.clientX, y:e.clientY};
+    if (!press.touch) {
+      e.preventDefault();
+      if (ev && handle && !ev.all_day) startDrag("resize");
+      else if (!ev && col) startDrag("create");
+    } else if (ev) {
+      press.timer = setTimeout(function(){
+        if (!press) return;
+        startDrag(ev.all_day ? "allday" : (handle ? "resize" : "move"));
+        if (navigator.vibrate) try{ navigator.vibrate(12); }catch(_){}
+      }, 320);
+    }
+  });
+  window.addEventListener("pointermove", function(e){
+    if (!press && !drag) return;
+    last = {x:e.clientX, y:e.clientY};
+    if (drag) { updateDrag(); autoScroll(); return; }
+    var dist = Math.hypot(e.clientX - press.x, e.clientY - press.y);
+    if (!press.touch && press.ev && dist > 4) startDrag(press.ev.all_day ? "allday" : "move");
+    else if (press.touch && dist > 9) { clearTimeout(press.timer); press = null; }
+  });
+  window.addEventListener("pointerup", function(e){
+    if (drag) { finishDrag(); return; }
+    if (!press) return;
+    var p = press; press = null; clearTimeout(p.timer);
+    if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 9) return;
+    if (p.ev) openEditor(p.ev);
+    else if (p.ad) openNew(Number(p.ad.dataset.day), 600, 660, true);
+    else if (p.col) { var loc = locate(e.clientX, e.clientY); var s = clamp(Math.floor(loc.min/60)*60, 0, 1380); openNew(Number(p.col.dataset.day), s, s+60, false); }
+  });
+  window.addEventListener("pointercancel", function(){ if (press) clearTimeout(press.timer); press = null; if (drag) cancelDrag(); });
+  document.addEventListener("touchmove", function(e){ if (drag) e.preventDefault(); }, {passive:false});
+  cal.addEventListener("contextmenu", function(e){ if (drag || (press && press.ev)) e.preventDefault(); });
+
+  function startDrag(mode){
+    var p = press; if (!p) return;
+    clearTimeout(p.timer);
+    var loc = locate(last.x, last.y);
+    drag = { mode:mode, ev:p.ev, moved:false, touch:p.touch, srcEl:p.evEl };
+    if (mode === "create") {
+      var a = clamp(floorSnap(loc.min), 0, 1440-SNAP);
+      drag.day = loc.day; drag.anchor = a; drag.start = a; drag.end = a + 30;
+    } else {
+      drag.day = dayIdx(p.ev.day); drag.start = p.ev.start_min; drag.end = p.ev.end_min;
+      drag.offset = loc.min - p.ev.start_min;
+      if (p.evEl) p.evEl.classList.add("dragging");
+    }
+    document.body.classList.add(mode === "resize" ? "is-resizing" : "is-dragging");
+    press = null;
+    if (mode !== "create") drawGhost();
+  }
+  function updateDrag(){
+    var loc = locate(last.x, last.y), d = drag, before = d.day+"|"+d.start+"|"+d.end;
+    if (d.mode === "move") {
+      var dur = d.ev.end_min - d.ev.start_min;
+      d.start = clamp(roundSnap(loc.min - d.offset), 0, 1440 - dur); d.end = d.start + dur; d.day = loc.day;
+    } else if (d.mode === "resize") {
+      d.end = clamp(roundSnap(loc.min), d.start + SNAP, 1440);
+    } else if (d.mode === "create") {
+      var m = loc.min;
+      if (m >= d.anchor) { d.start = d.anchor; d.end = clamp(Math.ceil(m/SNAP)*SNAP, d.anchor + SNAP, 1440); }
+      else { d.start = clamp(floorSnap(m), 0, d.anchor); d.end = d.anchor + SNAP; }
+    } else if (d.mode === "allday") {
+      d.day = loc.day;
+    }
+    var now = d.day+"|"+d.start+"|"+d.end;
+    if (now !== before || (d.mode==="create" && !d.moved && Math.abs(loc.min - d.anchor) > 8)) d.moved = true;
+    if (d.moved) drawGhost();
+  }
+  function drawGhost(){
+    var d = drag;
+    if (d.ghost) d.ghost.remove();
+    if (d.mode === "allday") {
+      d.ghost = el("div","chip ghost c-"+(d.ev.color||"ocean"), d.ev.title);
+      adCells[d.day].appendChild(d.ghost);
+      return;
+    }
+    var base = d.ev || {title:"", color:"ocean"};
+    var g = eventNode({title:base.title, color:base.color, location:base.location, start_min:d.start, end_min:d.end, created_by:base.created_by}, hourPx(), true);
+    g.classList.add("ghost"); if (d.mode === "create") g.classList.add("new");
+    g.style.left = "2px"; g.style.width = "calc(100% - 6px)";
+    cols[d.day].appendChild(g); d.ghost = g;
+  }
+  function endDragUI(){
+    stopAuto();
+    if (drag.ghost) drag.ghost.remove();
+    if (drag.srcEl) drag.srcEl.classList.remove("dragging");
+    document.body.classList.remove("is-dragging","is-resizing");
+  }
+  function cancelDrag(){ endDragUI(); drag = null; }
+  function finishDrag(){
+    var d = drag; endDragUI(); drag = null;
+    if (d.mode === "create") {
+      if (!d.moved) { var s = clamp(Math.floor(d.anchor/30)*30, 0, 1380); openNew(d.day, s, s+60, false); }
+      else openNew(d.day, d.start, d.end, false);
+      return;
+    }
+    if (!d.moved) { openEditor(d.ev); return; }
+    var patch = { day: DAYS[d.day].date };
+    if (d.mode !== "allday") { patch.start_min = d.start; patch.end_min = d.end; }
+    var ev = d.ev;
+    if (patch.day === ev.day && (patch.start_min === undefined || (patch.start_min === ev.start_min && patch.end_min === ev.end_min))) return;
+    if (!requireName(function(){ saveChange(ev, patch, d.mode === "resize" ? "Resized" : "Moved"); })) { render(); return; }
+    saveChange(ev, patch, d.mode === "resize" ? "Resized" : "Moved");
+  }
+  function autoScroll(){
+    var r = scroller.getBoundingClientRect(), edge = 44, vx = 0, vy = 0;
+    var topEdge = r.top + (drag && drag.mode === "allday" ? 0 : cal.querySelector(".dayhead").offsetHeight + cal.querySelector(".ad-cell").offsetHeight);
+    if (last.y < topEdge + edge && drag.mode !== "allday") vy = -Math.ceil((topEdge + edge - last.y)/4);
+    else if (last.y > r.bottom - edge && drag.mode !== "allday") vy = Math.ceil((last.y - (r.bottom - edge))/4);
+    var leftEdge = r.left + cal.querySelector(".gutter").offsetWidth;
+    if (last.x < leftEdge + edge) vx = -Math.ceil((leftEdge + edge - last.x)/4);
+    else if (last.x > r.right - edge) vx = Math.ceil((last.x - (r.right - edge))/4);
+    if (!vx && !vy) { stopAuto(); return; }
+    if (autoRAF) { autoRAF.vx = vx; autoRAF.vy = vy; return; }
+    autoRAF = {vx:vx, vy:vy, id:0};
+    (function step(){
+      if (!autoRAF || !drag) return;
+      scroller.scrollTop += clamp(autoRAF.vy,-18,18); scroller.scrollLeft += clamp(autoRAF.vx,-18,18);
+      updateDrag();
+      autoRAF.id = requestAnimationFrame(step);
+    })();
+  }
+  function stopAuto(){ if (autoRAF) cancelAnimationFrame(autoRAF.id); autoRAF = null; }
+
+  // ---------- saving ----------
+  function saveChange(ev, patch, verb){
+    var prev = {}; Object.keys(patch).forEach(function(k){ prev[k] = ev[k]; });
+    patch.updated_by = myName;
+    Object.assign(ev, patch); recentMine[ev.id] = Date.now(); render();
+    sb.from(TABLE).update(patch).eq("id", ev.id).select().then(function(res){
+      if (res.error || !res.data || !res.data.length) { Object.assign(ev, prev); render(); toast(res.error ? "Couldn't save — check your connection" : "That event was deleted by someone else"); load(); return; }
+      merge(res.data[0]); render();
+      toast(verb + " · saved for everyone");
+    });
+  }
+
+  // ---------- editor ----------
+  var editing = null; // {id|null, draft}
+  var timeOpts = [];
+  for (var m=0; m<=1440; m+=SNAP) timeOpts.push(m);
+  function fillSelect(sel, list, label){ sel.textContent=""; list.forEach(function(v){ var o=el("option",null,label(v)); o.value=v; sel.appendChild(o); }); }
+  DAYS.forEach(function(d){ var o = el("option", null, ({Tue:"Tuesday",Wed:"Wednesday",Thu:"Thursday",Fri:"Friday",Sat:"Saturday",Sun:"Sunday",Mon:"Monday"})[d.dow] + ", December " + d.num + (d.tag ? " · " + d.tag : "")); o.value = d.date; $("fDay").appendChild(o); });
+  fillSelect($("fStart"), timeOpts.slice(0,-1), function(v){ return fmt(v); });
+  COLORS.forEach(function(c){ var b = el("button","sw c-"+c); b.type="button"; b.dataset.color=c; b.title=COLOR_NAMES[c]; b.setAttribute("aria-label", COLOR_NAMES[c]); $("fColors").appendChild(b); });
+  $("fColors").addEventListener("click", function(e){ var b = e.target.closest(".sw"); if (b) setColor(b.dataset.color); });
+  function setColor(c){ Array.prototype.forEach.call($("fColors").children, function(b){ b.setAttribute("aria-pressed", String(b.dataset.color===c)); }); editing.color = c; }
+  function fillEnd(){
+    var s = Number($("fStart").value), cur = Number($("fEnd").value);
+    fillSelect($("fEnd"), timeOpts.filter(function(v){ return v > s; }), function(v){ var d=v-s; return fmt(v) + "  (" + (d<60? d+" min" : (d/60) + (d===60?" hr":" hrs")) + ")"; });
+    $("fEnd").value = String(cur > s ? cur : Math.min(s+60, 1440));
+  }
+  var lastStart = 0;
+  $("fStart").addEventListener("focus", function(){ lastStart = Number($("fStart").value); });
+  $("fStart").addEventListener("change", function(){
+    var s = Number($("fStart").value), dur = Number($("fEnd").value) - lastStart;
+    $("fEnd").value = ""; fillEnd(); $("fEnd").value = String(Math.min(s + (dur > 0 ? dur : 60), 1440)); lastStart = s;
+  });
+  $("fAllDay").addEventListener("change", function(){ $("timeRow").hidden = $("fAllDay").checked; });
+  $("fLoc").addEventListener("input", updateMap);
+  function updateMap(){
+    var v = $("fLoc").value.trim(), a = $("mapLink");
+    a.hidden = !v; if (v) a.href = "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(v + (/puerto rico|\bpr\b/i.test(v) ? "" : ", Puerto Rico"));
+  }
+
+  function openNew(dayI, s, e, allDay){
+    if (!requireName(function(){ openNew(dayI, s, e, allDay); })) return;
+    showEditor({ id:null, title:"", day:DAYS[dayI].date, all_day:!!allDay, start_min:s, end_min:e, location:"", notes:"", color:"ocean" });
+  }
+  function openEditor(ev){
+    if (!requireName(function(){ openEditor(ev); })) return;
+    showEditor(ev);
+  }
+  function showEditor(ev){
+    editing = { id: ev.id, color: ev.color || "ocean" };
+    $("fTitle").value = ev.title || ""; $("fDay").value = ev.day; $("fAllDay").checked = !!ev.all_day; $("timeRow").hidden = !!ev.all_day;
+    $("fStart").value = String(Math.min(ev.start_min, 1425)); lastStart = ev.start_min; $("fEnd").value = ""; fillEnd(); $("fEnd").value = String(ev.end_min);
+    $("fLoc").value = ev.location || ""; $("fNotes").value = ev.notes || ""; updateMap(); setColor(editing.color);
+    $("delBtn").hidden = !ev.id; $("fErr").hidden = true; $("saveBtn").disabled = false;
+    var meta = "";
+    if (ev.id) {
+      meta = "Added by " + (ev.created_by || "someone");
+      if (ev.updated_by && (ev.updated_by !== ev.created_by || ev.updated_at !== ev.created_at)) meta += " · last changed by " + ev.updated_by + " " + ago(ev.updated_at);
+      else meta += " " + ago(ev.created_at);
+    }
+    $("fMeta").textContent = meta; $("fMeta").hidden = !meta;
+    $("evScrim").hidden = false;
+    setTimeout(function(){ if (!ev.id) $("fTitle").focus(); }, 30);
+  }
+  function closeEditor(){ $("evScrim").hidden = true; editing = null; }
+  $("cancelBtn").addEventListener("click", closeEditor);
+  $("evScrim").addEventListener("pointerdown", function(e){ if (e.target === $("evScrim")) closeEditor(); });
+  $("evForm").addEventListener("submit", function(e){
+    e.preventDefault(); if (!editing) return;
+    var title = $("fTitle").value.trim();
+    if (!title) { showErr("Give the event a title."); $("fTitle").focus(); return; }
+    var row = { title:title, day:$("fDay").value, all_day:$("fAllDay").checked, location:$("fLoc").value.trim(), notes:$("fNotes").value.trim(), color:editing.color, updated_by:myName };
+    var s = Number($("fStart").value), en = Number($("fEnd").value);
+    if (!(en > s)) en = Math.min(s + 60, 1440);
+    row.start_min = s; row.end_min = en;
+    $("saveBtn").disabled = true;
+    var isNew = !editing.id, id = editing.id || uuid();
+    recentMine[id] = Date.now();
+    var q = isNew ? sb.from(TABLE).insert(Object.assign({id:id, created_by:myName}, row)).select()
+                  : sb.from(TABLE).update(row).eq("id", id).select();
+    q.then(function(res){
+      if (res.error || !res.data || !res.data.length) { $("saveBtn").disabled = false; showErr(res.error ? "Couldn't save: " + (res.error.message || "check your connection") : "Someone deleted this event while you were editing."); return; }
+      merge(res.data[0]); render(); closeEditor();
+      toast((isNew ? "Added" : "Saved") + " · everyone can see it");
+    });
+  });
+  $("delBtn").addEventListener("click", function(){
+    if (!editing || !editing.id) return;
+    var ev = byId(editing.id); if (!ev) { closeEditor(); return; }
+    if (!confirm("Delete “" + ev.title + "” for everyone?")) return;
+    var id = ev.id;
+    sb.from(TABLE).delete().eq("id", id).then(function(res){
+      if (res.error) { showErr("Couldn't delete: " + res.error.message); return; }
+      events = events.filter(function(x){ return x.id !== id; }); render(); closeEditor(); toast("Deleted");
+    });
+  });
+  function showErr(t){ $("fErr").textContent = t; $("fErr").hidden = false; }
+
+  // ---------- name ----------
+  var afterName = null;
+  function updateWho(){
+    var b = $("whoBtn"); b.textContent = "";
+    if (myName) { b.appendChild(document.createTextNode("Planning as ")); b.appendChild(el("b",null,myName)); }
+    else b.textContent = "Add your name";
+  }
+  function requireName(then){ if (myName) return true; askName(then); return false; }
+  function askName(then){
+    afterName = then || null;
+    $("nameInput").value = myName; $("nameCancel").hidden = !myName;
+    $("nameScrim").hidden = false; setTimeout(function(){ $("nameInput").focus(); }, 30);
+  }
+  $("nameForm").addEventListener("submit", function(e){
+    e.preventDefault(); var v = $("nameInput").value.trim().slice(0,40); if (!v) return;
+    myName = v; store("prtrip.name", v); updateWho(); $("nameScrim").hidden = true;
+    var f = afterName; afterName = null; if (f) f();
+  });
+  $("nameCancel").addEventListener("click", function(){ $("nameScrim").hidden = true; afterName = null; });
+  $("whoBtn").addEventListener("click", function(){ askName(null); });
+  $("addBtn").addEventListener("click", function(){ openNew(0, 600, 660, false); });
+  document.addEventListener("keydown", function(e){
+    if (e.key !== "Escape") return;
+    if (drag) { cancelDrag(); return; }
+    if (!$("evScrim").hidden) closeEditor(); else if (!$("nameScrim").hidden && myName) $("nameScrim").hidden = true;
+  });
+
+  // ---------- sync ----------
+  function merge(row){
+    var cur = byId(row.id);
+    if (cur) Object.assign(cur, row); else events.push(row);
+  }
+  function changedByOthers(row){ var t = recentMine[row.id]; return !(t && Date.now() - t < 5000); }
+  var loading = false;
+  function load(){
+    if (loading) return; loading = true;
+    sb.from(TABLE).select("*").order("day").order("start_min").then(function(res){
+      loading = false; $("loading").hidden = true;
+      if (res.error) { setStatus("err","Can't reach the calendar — retrying"); return; }
+      var flash = {}, old = {};
+      events.forEach(function(e){ old[e.id] = e.updated_at; });
+      if (events.length) res.data.forEach(function(r){ if (old[r.id] !== r.updated_at && changedByOthers(r)) flash[r.id] = 1; });
+      if (drag) { // don't yank things around mid-drag; apply after
+        pendingRows = res.data; return;
+      }
+      events = res.data; render(flash);
+      if (channelOk) setStatus("live","Live — changes appear for everyone");
+      else setStatus("live","Synced");
+    });
+  }
+  var pendingRows = null, channelOk = false;
+  setInterval(function(){ if (pendingRows && !drag) { events = pendingRows; pendingRows = null; render(); } }, 500);
+
+  function subscribe(){
+    sb.channel("pr-trip-events")
+      .on("postgres_changes", {event:"*", schema:"public", table:TABLE}, function(p){
+        if (p.eventType === "DELETE") { var id = p.old && p.old.id; if (!id) return; events = events.filter(function(e){ return e.id !== id; }); }
+        else if (p.new && p.new.id) { var f = {}; if (changedByOthers(p.new)) f[p.new.id] = 1; merge(p.new); if (drag) return; render(f); return; }
+        if (!drag) render();
+      })
+      .subscribe(function(status){
+        channelOk = status === "SUBSCRIBED";
+        if (channelOk) { setStatus("live","Live — changes appear for everyone"); load(); }
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") setStatus("", "Syncing every few seconds");
+      });
+  }
+
+  // ---------- start ----------
+  buildGrid();
+  myName = store("prtrip.name") || ""; updateWho();
+  scroller.scrollTop = 8 * hourPx() - 6;
+  if (!window.supabase) { $("loading").textContent = "Couldn't load — please refresh the page."; setStatus("err","Offline"); return; }
+  sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession:false, autoRefreshToken:false } });
+  load(); subscribe();
+  setInterval(function(){ if (!document.hidden) load(); }, 30000);
+  setInterval(function(){ if (!document.hidden && !channelOk) load(); }, 8000);
+  document.addEventListener("visibilitychange", function(){ if (!document.hidden) load(); });
+  window.addEventListener("focus", load);
+  if (!myName) askName(null);
+})();
+</script>
+</body>
+</html>
